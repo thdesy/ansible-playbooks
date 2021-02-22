@@ -1,0 +1,59 @@
+# https://pwr-solaar.github.io/Solaar/installation
+---
+- name: setup Logitech Unifying Reciever Helper 
+  hosts: localhost
+  connection: local
+  become: true
+  become_user: root
+  tasks:
+  - name: start info
+    debug:
+      msg: "Preparing local installation of Solaar for Unifying Receivers and Devices Logitech - see https://pwr-solaar.github.io/Solaar (change hosts in the playbook for other targets etc.)"
+  - name: Creates Ansible Base Directory for helper and resoruces
+    file:
+      path: /var/spool/ansible
+      state: directory
+  - name: ensure that required packages are installed
+    dnf:
+      name: [python3-pyudev,python3-pyudev-qt5,python3-pyudev-qt4,python3-pyyaml,python3-yaml,python3-xlib,gtk3,python3-gobject,libindicator,libindicator-gtk3-tools,libindicator-tools,git]
+      state: latest
+  # - name: If the Solaar repo has been checked out locally, you probably want to use it to copy Solaar source dir and install it from there later on - consolidate source dirs later during refactor...
+  #   copy:
+  #     src: /data/git/Solaar
+  #     dest: /var/spool/ansible/
+  #     owner: nobody
+  #     group: nobody
+  #     mode: 0644
+  - name: Checking out the Solaar Repo from Github
+    git:
+      repo: 'https://github.com/pwr-Solaar/Solaar.git'
+      dest: /var/spool/ansible/Solaar
+      version: 'HEAD'
+      clone: yes
+      update: yes
+  - name: install the package from the ansible resource dir
+    pip:
+      name: file:////var/spool/ansible/Solaar
+  - name: copying udev rule
+    copy:
+      src: /var/spool/ansible/Solaar/rules.d/42-logitech-unify-permissions.rules
+      dest: /etc/udev/rules.d/42-logitech-unify-permissions.rules
+      owner: root
+      group: root
+      mode: 0644
+  - name: autostart info
+    debug:
+      msg: "Preparing autostart of Solaar for all users under /etc/xdg/autostart/solaar.desktop. Alternatively check the /share/autostart/solaar.desktop rule with a flag to hide the info window 'Exec=solaar --window=hide' "
+  - name: copying autostart rule - Solaar should be started now for every user
+    copy:
+      src: /var/spool/ansible/Solaar/share/applications/solaar.desktop
+      dest: /etc/xdg/autostart/solaar.desktop
+      owner: root
+      group: root
+      mode: 0644
+  - name: reload udev rules
+    command:
+      cmd: udevadm control --reload-rules 
+  - name: done info
+    debug:
+      msg: "Should all be installed - probably need to restart/relogin for all to take effect"
