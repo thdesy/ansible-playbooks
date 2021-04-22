@@ -12,3 +12,24 @@ Since no prebuild packages are around for my Fedora (33 as of writing), I wrote 
 ```
 ansible-playbook Solaar.pb/Logitech_solaar.yaml
 ```
+
+### Virtual Box with signing akmod kernel extensions for UEFI
+Installing on Fedora VirtualBox including the extension pack for USB3 support (beware, that the licences by Oracle for Virtual Box and especially for the extension pack are precarious and probably only usable for a strict private use)
+
+```
+ansible-playbook VirtualBox/virtualbox.yaml
+```
+
+Since I boot my computer through a UEFI (BIOS), I need to sign the akmod kernel extensions, that VirtualBox is (hopefully) building for each new kernel. To do so, an ad hoc CA certificat/key is created.
+
+```
+ansible-playbook VirtualBox/virtualbox_kernelextensions.yaml
+```
+
+With the first run, you will probably need to register the cert manually by running as root/sudo/wheel
+ ```
+  /usr/bin/mokutil --import  /etc/kernel.sign.d/public_key.der
+ ```
+where you will be asked for a password (no idea how to automatize that properly...).
+During the next reboot, you should be asked enroll the certificate with the enetred password into the approved keys in UEFI. Afterwards, the kernel extensions should be accepted.
+  

@@ -1,0 +1,26 @@
+---
+- name: Install Goocle  Chrome
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    myUser: 'YOURUSERNAME'
+  tasks:
+    - name: Import the Google Repository Key
+      rpm_key:
+        state: present
+        key: https://dl.google.com/linux/linux_signing_key.pub
+    - name: Copy the repo file
+      copy:
+        src: "files/etc/yum.repos.d/google-chrome.repo"
+        dest: /etc/yum.repos.d/google-chrome.repo
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Install Chrome
+      dnf:
+        name:
+          - google-chrome-stable
+          - google-droid-fonts-all
+          - googler
+        state: latest

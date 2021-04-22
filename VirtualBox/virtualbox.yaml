@@ -1,0 +1,68 @@
+---
+# details on akmod  https://rpmfusion.org/Howto/VirtualBox
+- name: Install and setup Virtual Box
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    myUser: 'YOURUSERNAME'
+  tasks:
+    - name: Create a dedicated directory for VMs and own it to my user
+      file:
+        path: /vm
+        state: directory
+        mode: '0755'
+        owner: '{{ myUser }}'
+        group: '{{ myUser }}'
+    - name: Import the Virtual Box Repository Key
+      rpm_key:
+        state: present
+        key: https://www.virtualbox.org/download/oracle_vbox.asc
+    - name: Get the Virtual Box Repo
+      get_url:
+        url: "https://download.virtualbox.org/virtualbox/rpm/fedora/virtualbox.repo"
+        dest: /etc/yum.repos.d/virtualbox.repo
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Install the Virtual Box Package
+      dnf:
+        name:
+          - dkms
+          - VirtualBox
+          - VirtualBox-kmodsrc
+          - kmod-VirtualBox
+          - akmod-VirtualBox
+          - virtualbox-guest-additions
+        state: latest
+    - name: Adding user {{ myUser }}  to the Virtual Box group
+      user:
+        name: "{{ myUser }}"
+        group: "vboxusers"
+        append: yes
+    - name: Get the installed Virtual Box version, so that we can download the matching extension pack
+      shell:
+        cmd: "dnf list --installed VirtualBox   | grep VirtualBox| awk '{print $2}' | awk -F '-' '{print $1}'"
+      register: versionVirtualBox
+    - debug: msg="we have {{ versionVirtualBox.stdout }}"
+    - name: Register the Virtual Box version as fact
+      set_fact:
+        version_virtual_box: "{{ versionVirtualBox.stdout }}"
+        cacheable: yes
+    - name: "Get the Virtual Box Extension Pack https://download.virtualbox.org/virtualbox/{{ version_virtual_box }}/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+      get_url:
+        url: "https://download.virtualbox.org/virtualbox/{{ version_virtual_box }}/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+        dest: "/tmp/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+        owner: "{{ myUser }}"
+        group: "{{ myUser }}"
+        mode: '0644'
+    - name: Install the Virtual Box extension pack
+      shell:
+        # yesyesyesyesyesyes
+        cmd: "yes | vboxmanage extpack install /tmp/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+        removes: "/tmp/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+        creates: "/usr/lib64/virtualbox/ExtensionPacks/Oracle_VM_VirtualBox_Extension_Pack/"
+    - name: Clean up and remove the extension file
+      file:
+        path: "/tmp/Oracle_VM_VirtualBox_Extension_Pack-{{ version_virtual_box }}.vbox-extpack"
+        state: absent

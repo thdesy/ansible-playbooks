@@ -1,0 +1,54 @@
+---
+# https://help.resilio.com/hc/en-us/articles/206178924-Installing-Sync-package-on-Linux
+# details on akmod  https://rpmfusion.org/Howto/VirtualBox
+- name: Attempt to sign VirtualBox akmod kernel extensions *fingers crossed*
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    ca_distinguished_name: 'MyKernelCA'
+  tasks:
+    - name: Ensure a directory to keep the certificate & key for signing our kernel extensions
+      file:
+        path: '/etc/kernel.sign.d'
+        state: directory
+        mode: '0700'
+        owner: 'root'
+        group: 'root'
+      register: kernel_ext_signdir
+    - name: Write a configuration with information to create a X509 CA 
+      template:
+        src: 'virtualbox_kernelextensions.x509.config.js'
+        dest: '/etc/kernel.sign.d/x509.config'
+      register: kernel_ext_x509conf
+    - name: check if cert file exists
+      stat: 
+        path: /etc/kernel.sign.d/public_key.der
+      register: kernel_ext_x509_key
+    - name: Create the certificate and key if not already present
+      shell:
+        cmd: "/usr/bin/openssl req -x509 -new -utf8 -sha256 -batch -config /etc/kernel.sign.d/x509.config -outform DER -out /etc/kernel.sign.d/public_key.der -keyout /etc/kernel.sign.d/private_key.priv"
+      args:
+        creates:
+          - /etc/kernel.sign.d/public_key.der
+          - /etc/kernel.sign.d/private_key.priv
+      when: not kernel_ext_x509_key.stat.exists
+      register: kernel_ext_x509_created
+    # - name: Register the CA for kernel module signing
+    #   shell:
+    #     cmd: "/usr/bin/mokutil --root-pw --import  /etc/kernel.sign.d/public_key.der"
+    #   when: kernel_ext_x509_created
+    - name: Enroll the key manually as I have no good idea how to automatize it and `--root-pw` fails 
+      debug:
+        msg: "Please enroll the CA certificate manually by running: >> /usr/bin/mokutil --import  /etc/kernel.sign.d/public_key.der << \n\n please remeber the password, as you will need to register it in the BIOS after the enxt reboot"
+      when: kernel_ext_x509_created
+    - name: Sign the kernel extensions
+      shell:
+        cmd: 'for i in /usr/lib/modules/$(uname -r)/extra/VirtualBox/*ko; do  /usr/src/kernels/$(uname -r)/scripts/sign-file sha256 /etc/kernel.sign.d/private_key.priv  /etc/kernel.sign.d/public_key.der "$i"; done'
+    - name: Restart the virtual box service (assuming that the key is already registered in the UEFI BIOS)
+      service:
+        name: vboxdrv.service
+        state: restarted
+    - name: Closing message
+      debug:
+        msg: "If Virtual Box still fails, pelase reboot and check, if you have to register the key in UEFI/BIOS"

@@ -1,0 +1,24 @@
+---
+# https://support.zoom.us/hc/en-us/articles/204206269-Installing-or-updating-Zoom-on-Linux#h_825b50ac-ad15-44a8-9959-28c97e4803ef
+- name: Install Zoom on Fedora
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    myUser: 'YOURUSERNAME'
+    thisApp: 'Zoom'
+    thisAppPath: '/usr/bin/zoom'
+  tasks:
+    - name: Import the Zoom repo Key
+      rpm_key:
+        state: present
+        key: https://zoom.us/linux/download/pubkey
+    - name: Install Zoom from their remote URL
+      dnf:
+        name: 'https://zoom.us/client/latest/zoom_x86_64.rpm'
+        state: present
+    - include_tasks: autostart.yaml
+      vars:
+        myUser: '{{ myUser }}'
+        thisApp: 'Zoom'
+        thisAppPath: '/usr/bin/zoom'
